@@ -57,6 +57,15 @@ class SIM2D:
         # for each speaker index, assign the relevant location in people_loc to a "1"
         self.people_loc[:,2][speaker_indices] = 1
 
+    def sample_action_discrete(self):
+        return np.random.choice(self.actions)
+    
+    def sample_action_continuous(self):
+        """Currently (Δx, Δy) to move"""
+        delx = np.random.uniform(0, 3)
+        dely = np.random.uniform(0, 2)
+        return delx, dely
+    
     def return_state(self):
         state = np.ones((1, len(self.people_loc[0]), len(self.people_loc)))
         for i in range(len(self.people_loc[0])):

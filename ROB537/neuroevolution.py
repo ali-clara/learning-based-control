@@ -42,13 +42,15 @@ class NeuralNetwork(nn.Module):
         output = self.linear_relu_stack(x)
         return output
 
-
 class NeuroEvolution():
-    def __init__(self) -> None:
-        pass
+    def __init__(self, num_states) -> None:
 
+        self.num_states = num_states
+        self.network_pool = None
+    
     def _rand_matrix_index(self, matrix):
-        """Returns (list) a random valid index within a matrix"""
+        """ Mutation and crossover helper function.
+            Returns (list) a random valid index within a matrix"""
         dimension = matrix.shape
         indices = []
         for dim in dimension:
@@ -57,14 +59,15 @@ class NeuroEvolution():
         return indices
     
     def _select_weight_matrix(self, model_dictionaries):
-        """Takes in a list of dictionaries representing the model weights
+        """Mutation and crossover helper function.
+            Takes in a list of dictionaries representing the model weights
             and biases (called by model.state_dict()), picks a random weight or bias
             matrix, and returns a list of each dict matrix"""
         # randomly select a weight or bias matrix
         model_state_dict = model_dictionaries[0]
         keys = list(model_state_dict.keys())
         # weight_matrix_key = np.random.choice(keys)
-        weight_matrix_key = keys[1]
+        weight_matrix_key = keys[0]
         # grab that matrix for all given inputs
         weight_matrices = [dict[weight_matrix_key] for dict in model_dictionaries]
 
@@ -78,8 +81,9 @@ class NeuroEvolution():
             4. changing the sign of the weight
             """
         # pull random weight or bias matrix from model
-        state_dict_copy = copy.deepcopy(model.state_dict())
-        weight_matrix, key = self._select_weight_matrix(state_dict_copy)
+        state_dict_copy = copy.copy(model.state_dict())
+        weight_matrix, key = self._select_weight_matrix([state_dict_copy])
+        weight_matrix = weight_matrix[0]
         
         # pick a random value to change
         pos1, pos2 = self._rand_matrix_index(weight_matrix)
@@ -102,6 +106,7 @@ class NeuroEvolution():
             weight_matrix[pos1, pos2] *= -1
 
         # load new state dictionary back into model
+        state_dict_copy[key] = weight_matrix
         model.load_state_dict(state_dict_copy)
         return model
     
@@ -129,6 +134,7 @@ class NeuroEvolution():
             try:
                 swap1, swap2 = self._rand_matrix_index(weight_matrix1)
                 weight_matrix1[swap1, swap2] = weight_matrix2[swap1, swap2]
+                print(swap1, swap2)
             # breaks for a 1D matrix (bias terms)
             except ValueError:
                 swap = self._rand_matrix_index(weight_matrix1)[0]
@@ -137,8 +143,56 @@ class NeuroEvolution():
         state_dict1[key] = weight_matrix1 
         child.load_state_dict(state_dict1)
         return child
+    
+    def _generate_networks(self, num_networks):
+        self.network_pool = np.zeros((num_networks, 2), dtype=object)
+        for i, _ in enumerate(self.network_pool):
+            self.network_pool[i,0] = NeuralNetwork(self.num_states)
 
+    def _select_networks(self, num_returned, epsilon=0.1, test=False):
+        """Either selects the n best networks from the pool or choses n random networks from the pool"""
+        prob = np.random.uniform()
+        # ε% of the time, choose a random network
+        if prob < epsilon:
+            networks = np.random.choice(self.network_pool[:,0], size=num_returned, replace=False)
+        # otherwise, choose the network with the highest fitness (located in network_pool[:,1])
+        else:
+            # sort the fitnesses of each network
+            sorted_network_indices = np.argsort(self.network_pool[:,1])
+            # invert that so the highest fitness is at the top
+            sorted_network_indices = sorted_network_indices[::-1]
+            # pick the n best networks
+            n_indices = sorted_network_indices[0:num_returned]
+            best_n_networks = self.network_pool[n_indices]
+            networks = best_n_networks[:,0]
 
+        if test:
+            return networks
+        else:
+            return copy.deepcopy(networks)
+        
+    def _remove_networks(self, num_removed):
+        """Removes the n worst networks from the list"""
+        # sort the fitnesses of each network
+        sorted_network_indices = np.argsort(self.network_pool[:,1])
+        # pick the n worst networks to remove
+        n_indices = sorted_network_indices[0:num_removed]
+        self.network_pool = np.delete(self.network_pool, n_indices, axis=0)
+
+    def select_action(self, network, state, epsilon=0.1):
+        """in the gridworld, actions are currently (11/22) move by (Δx, Δy). Going 
+            to eventualy move to (θ, φ) angle pan"""
+        prob = np.random.uniform()
+        # ε% of the time, move randomly
+        if prob < epsilon:
+            action = gridworld.sample_action_continuous()
+            action = torch.tensor([action], device=device, dtype=torch.float32, requires_grad=False)
+        # otherwise, query the network
+        else:
+            action = network(state)
+
+        return action
+            
 ## ------------- FLIGHT CODE ------------- ##
 if __name__ == "__main__":
 
@@ -152,18 +206,16 @@ if __name__ == "__main__":
     input = torch.tensor(states, device=device, dtype=torch.float32, requires_grad=False)
     output = model(input)
     # print(input)
-    # print(output)
 
     # access the weights and biases
     # for name, param in model.named_parameters():
     #     weight = param.data # tensor
         # print(name)
 
-    alg = NeuroEvolution()
-
-    child = alg.crossover(model, model2)
-
-    print(model.state_dict()["linear_relu_stack.0.bias"])
-    print(model2.state_dict()["linear_relu_stack.0.bias"])
-    print(child.state_dict()["linear_relu_stack.0.bias"])
+    alg = NeuroEvolution(num_states)
+    alg._generate_networks(3)
+    alg.network_pool[1,1] = 700
+    print(alg.network_pool)
+    alg._remove_networks(1)
+    print(alg.network_pool)
 
