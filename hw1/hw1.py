@@ -148,7 +148,8 @@ pair = 1
 train_inputs, train_outputs = preprocess("train"+str(pair)+".csv")
 test_inputs, test_outputs = preprocess("test"+str(pair)+".csv")
 
-do_training = False
+
+do_training = True
 # train and test the data with different parameters
 if do_training == True:
     epochs = 5
@@ -159,7 +160,7 @@ if do_training == True:
     test_correct = []
 
     # Run for 10 trials
-    trials = 10
+    trials = 1
     for trial in range(trials):
         # training
         train_err_list, train_correct_list = train(train_inputs, train_outputs, num_hidden=num_hidden, epochs=epochs, learning_rate=initial_learning_rate)
@@ -181,18 +182,21 @@ if do_training == True:
 
         test_correct.append(num_correct)
 
-    train_correct_avg = np.mean(train_correct, axis=0)
-    test_correct_avg = np.mean(test_correct)
-    test_correct_stdv = np.std(test_correct)
-    train_iterations = np.linspace(1, epochs, len(train_correct_avg))
-
-    print(f"Average test correct classification percentage: {test_correct_avg/400}")
-    print(f"Standard deviation: {test_correct_stdv/400}")
-
-    fig, ax = plt.subplots(1,1)
-    y = np.array(train_correct_avg)/400
-    ax.plot(train_iterations, y, label="Hidden units: "+str(num_hidden))
-    ax.set_title(f"Average Training {pair} Results with {num_hidden} Hidden Units, {initial_learning_rate} Learning Rate")
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Correct Classification Percentage")
+    plt.plot(train_err_list)
     plt.show()
+
+    # train_correct_avg = np.mean(train_correct, axis=0)
+    # test_correct_avg = np.mean(test_correct)
+    # test_correct_stdv = np.std(test_correct)
+    # train_iterations = np.linspace(1, epochs, len(train_correct_avg))
+
+    # print(f"Average test correct classification percentage: {test_correct_avg/400}")
+    # print(f"Standard deviation: {test_correct_stdv/400}")
+
+    # fig, ax = plt.subplots(1,1)
+    # y = np.array(train_correct_avg)/400
+    # ax.plot(train_iterations, y, label="Hidden units: "+str(num_hidden))
+    # ax.set_title(f"Average Training {pair} Results with {num_hidden} Hidden Units, {initial_learning_rate} Learning Rate")
+    # ax.set_xlabel("Epoch")
+    # ax.set_ylabel("Correct Classification Percentage")
+    # plt.show()
